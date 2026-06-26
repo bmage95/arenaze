@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: arenaze-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arenaze
+      POSTGRES_PASSWORD: arenaze
+      POSTGRES_DB: arenaze
+    ports:
+      - "5433:5432"
+    volumes:
+      - arenaze-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arenaze -d arenaze"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  arenaze-pgdata:

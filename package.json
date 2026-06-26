@@ -1,0 +1,30 @@
+{
+  "name": "arenaze",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Arenaze — gaming-café operator console (Phase 1). Full-stack: Fastify + Postgres + React/Vite.",
+  "workspaces": [
+    "shared",
+    "db",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c magenta,cyan \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm -w @arenaze/server run dev",
+    "dev:web": "npm -w @arenaze/web run dev",
+    "build": "npm -w @arenaze/web run build",
+    "db:migrate": "npm -w @arenaze/db run migrate",
+    "db:seed": "npm -w @arenaze/db run seed",
+    "db:reset": "npm -w @arenaze/db run reset",
+    "typecheck": "npm -w @arenaze/shared run typecheck && npm -w @arenaze/server run typecheck && npm -w @arenaze/web run typecheck",
+    "start:server": "npm -w @arenaze/server run start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
