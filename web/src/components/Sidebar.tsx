@@ -18,7 +18,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/', label: 'Floor', Icon: I.floor, end: true },
   { to: '/ledger', label: 'Bookings', Icon: I.res },
-  { to: '/availability', label: 'Availability', Icon: I.avail },
   { to: '/customers', label: 'Customers', Icon: I.mem },
   { to: '/analytics', label: 'Analytics', Icon: I.ana, admin: true },
   { to: '/pricing', label: 'Pricing', Icon: I.price, admin: true },

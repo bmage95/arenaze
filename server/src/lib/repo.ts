@@ -134,7 +134,8 @@ export async function loadBookings(
   }));
 }
 
-/** Find a customer by id or handle, else create one from the input. Returns id or null. */
+/** Find a customer by id or contact number (handle as a legacy fallback), else
+ * create one from the input. Returns id or null. */
 export async function resolveCustomer(
   client: Db,
   tenantId: string,
@@ -142,7 +143,15 @@ export async function resolveCustomer(
 ): Promise<string | null> {
   if (!input) return null;
   if (input.id) return input.id;
-  if (input.handle) {
+  // Match an existing customer by contact number first, then by handle (legacy).
+  if (input.phone && input.phone.trim()) {
+    const { rows } = await query<{ id: string }>(
+      `SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 LIMIT 1`,
+      [tenantId, input.phone.trim()],
+      client,
+    );
+    if (rows[0]) return rows[0].id;
+  } else if (input.handle) {
     const { rows } = await query<{ id: string }>(
       `SELECT id FROM customers WHERE tenant_id = $1 AND lower(handle) = lower($2) LIMIT 1`,
       [tenantId, input.handle],
@@ -150,10 +159,10 @@ export async function resolveCustomer(
     );
     if (rows[0]) return rows[0].id;
   }
-  if (input.name || input.handle) {
+  if (input.name || input.phone || input.handle) {
     const { rows } = await query<{ id: string }>(
       `INSERT INTO customers (tenant_id, name, handle, phone) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [tenantId, input.name ?? input.handle ?? 'Walk-in', input.handle ?? '', input.phone ?? null],
+      [tenantId, input.name ?? input.handle ?? 'Walk-in', input.handle ?? '', input.phone?.trim() || null],
       client,
     );
     return rows[0].id;

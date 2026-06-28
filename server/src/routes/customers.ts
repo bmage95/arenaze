@@ -55,7 +55,7 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
     if (q && q.trim()) {
       const like = `%${q.trim().toLowerCase()}%`;
       const { rows } = await query<CustomerRow>(
-        `${SELECT} AND (lower(c.name) LIKE $2 OR lower(c.handle) LIKE $2) ORDER BY spend DESC, c.name`,
+        `${SELECT} AND (lower(c.name) LIKE $2 OR c.phone LIKE $2) ORDER BY spend DESC, c.name`,
         [tenantId, like],
       );
       return rows.map(toDTO);

@@ -15,14 +15,16 @@ export interface Tweaks {
 }
 
 export const TWEAK_DEFAULTS: Tweaks = {
-  theme: 'maroon',
+  theme: 'carbon',
   typeface: 'chakra',
   density: 'compact',
   corners: 'chamfer',
   glow: true,
 };
 
-const STORE_KEY = 'arenaze.tweaks';
+// Bumped to .v2 so older saved prefs (which defaulted to the maroon theme) are
+// dropped and the confirmed carbon theme is live for everyone on next load.
+const STORE_KEY = 'arenaze.tweaks.v2';
 
 export function useTweaks(defaults: Tweaks = TWEAK_DEFAULTS) {
   const [tweaks, setTweaks] = useState<Tweaks>(() => {

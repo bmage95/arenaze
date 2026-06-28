@@ -1,8 +1,9 @@
 // Floor / Device Monitor — the flagship live-ops screen. Ported from
-// _design_ref/gg-app.jsx (Floor + Drawer + WalkinModal) and wired to the real
-// API: useDevices() polls the snapshot every 10s, tiles tick a 1s clock for live
+// _design_ref/gg-app.jsx (Floor + Drawer) and wired to the real API:
+// useDevices() polls the snapshot every 10s, tiles tick a 1s clock for live
 // countdowns + accrued tabs, and every action goes through a typed mutation that
-// auto-invalidates the floor.
+// auto-invalidates the floor. The header's "Check Availability" button opens the
+// AvailabilityDrawer (check a slot + book / seat a walk-in from one panel).
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DEVICE_TYPES,
@@ -20,7 +21,6 @@ import {
   useEndSession,
   useExtendDevice,
   usePatchDevice,
-  useCreateBooking,
 } from '../api/queries';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -29,8 +29,7 @@ import { Metric } from '../components/Metric';
 import { Chip } from '../components/Chip';
 import { Pill, type PillKind } from '../components/Pill';
 import { Drawer } from '../components/Drawer';
-import { Modal } from '../components/Modal';
-import { I } from '../components/icons';
+import { AvailabilityDrawer } from '../components/AvailabilityDrawer';
 
 // ---------------------------------------------------------------------------
 // Local helpers
@@ -86,7 +85,7 @@ export function Floor() {
   const [now, setNow] = useState(() => Date.now());
   const [filter, setFilter] = useState<Set<DeviceType>>(new Set());
   const [selId, setSelId] = useState<string | null>(null);
-  const [walkinOpen, setWalkinOpen] = useState(false);
+  const [availOpen, setAvailOpen] = useState(false);
   const [flash, setFlash] = useState<Set<string>>(new Set());
 
   // 1s tick drives the live countdowns + accrued tabs.
@@ -118,7 +117,10 @@ export function Floor() {
       <div
         key={d.id}
         className={'tile ' + cls + (flash.has(d.id) ? ' flash' : '')}
-        onClick={() => setSelId(d.id)}
+        onClick={() => {
+          setAvailOpen(false);
+          setSelId(d.id);
+        }}
       >
         <span className="bar" />
         <span className="pf">{d.type}</span>
@@ -206,14 +208,20 @@ export function Floor() {
         />
       </div>
 
-      {/* head + walk-in */}
+      {/* head + check-availability */}
       <div className="shead">
         <div className="t">
           Floor · Live
           <span className="ct">{devices.length} STATIONS</span>
         </div>
-        <button className="btn primary sm" onClick={() => setWalkinOpen(true)}>
-          + Walk-in
+        <button
+          className="btn primary sm"
+          onClick={() => {
+            setSelId(null);
+            setAvailOpen(true);
+          }}
+        >
+          Check Availability
         </button>
       </div>
 
@@ -268,15 +276,16 @@ export function Floor() {
         />
       )}
 
-      <WalkinModal
-        open={walkinOpen}
-        devices={devices}
-        onClose={() => setWalkinOpen(false)}
-        onFlash={(ids) => {
-          setFilter(new Set());
-          flashBays(ids);
-        }}
-      />
+      {availOpen && (
+        <AvailabilityDrawer
+          devices={devices}
+          onClose={() => setAvailOpen(false)}
+          onBooked={(ids) => {
+            setFilter(new Set());
+            flashBays(ids);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -559,146 +568,5 @@ function StationDrawer({
         </dd>
       </dl>
     </Drawer>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Walk-in modal — seat N adjacent open bays of a platform, immediately active.
-// ---------------------------------------------------------------------------
-function WalkinModal({
-  open,
-  devices,
-  onClose,
-  onFlash,
-}: {
-  open: boolean;
-  devices: DeviceSnapshot[];
-  onClose: () => void;
-  onFlash: (ids: string[]) => void;
-}) {
-  const { notify } = useToast();
-  const createM = useCreateBooking();
-
-  const [pf, setPf] = useState<DeviceType>('PC');
-  const [qty, setQty] = useState(1);
-  const [dur, setDur] = useState(60);
-
-  const freeOf = devices.filter((d) => d.type === pf && d.status === 'available');
-  const enough = freeOf.length >= qty;
-
-  const seat = () => {
-    createM.mutate(
-      {
-        deviceType: pf,
-        guests: qty,
-        startAt: new Date().toISOString(),
-        durationMinutes: dur,
-        extendable: false,
-        customer: { name: 'Walk-in' },
-      },
-      {
-        onSuccess: (b) => {
-          const labels = b.devices.map((d) => d.label);
-          onFlash(b.devices.map((d) => d.deviceId));
-          onClose();
-          notify(
-            <>
-              Seated <b>{labels.length}</b> walk-in{labels.length > 1 ? 's' : ''} ·{' '}
-              <b>{labels.join(', ')}</b>
-            </>,
-          );
-        },
-        onError: (e) =>
-          notify(
-            e instanceof ApiError && e.code === 'slot_taken'
-              ? 'Slot just taken — try again'
-              : apiErr(e),
-          ),
-      },
-    );
-  };
-
-  return (
-    <Modal open={open} onClose={onClose}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h3>Seat a walk-in</h3>
-          <div
-            className="mono"
-            style={{
-              fontSize: 11,
-              color: 'var(--faint)',
-              letterSpacing: '.1em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Auto-assign open bays
-          </div>
-        </div>
-        <button className="x" onClick={onClose} aria-label="Close">
-          <I.x />
-        </button>
-      </div>
-
-      <div className="field" style={{ marginTop: 22 }}>
-        <span className="lab">Platform</span>
-        <div className="seg">
-          {DEVICE_TYPES.map((t) => {
-            const n = devices.filter((d) => d.type === t && d.status === 'available').length;
-            return (
-              <Chip key={t} on={pf === t} dot onClick={() => setPf(t)}>
-                {t} · {n}
-              </Chip>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="row" style={{ marginTop: 18 }}>
-        <div className="field" style={{ flex: 1 }}>
-          <span className="lab">Players</span>
-          <div className="seg">
-            {[1, 2, 3, 5].map((q) => (
-              <Chip key={q} on={qty === q} onClick={() => setQty(q)}>
-                {q}
-              </Chip>
-            ))}
-          </div>
-        </div>
-        <div className="field" style={{ flex: 1 }}>
-          <span className="lab">Duration</span>
-          <div className="seg">
-            {DURATIONS.map((d) => (
-              <Chip key={d} on={dur === d} onClick={() => setDur(d)}>
-                {d}m
-              </Chip>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          marginTop: 20,
-          fontSize: 13,
-          color: enough ? 'var(--dim)' : 'var(--red-bright)',
-          fontFamily: 'var(--f-mono)',
-          letterSpacing: '.04em',
-        }}
-      >
-        {enough
-          ? `${freeOf.length} ${pf} bays open — assigning ${qty} adjacent`
-          : `Only ${freeOf.length} ${pf} bays free — can't seat ${qty}`}
-      </div>
-
-      <button
-        className="btn primary"
-        style={{ width: '100%', marginTop: 18, justifyContent: 'center' }}
-        disabled={!enough || createM.isPending}
-        onClick={seat}
-      >
-        {createM.isPending ? 'Seating…' : 'Seat & Start →'}
-      </button>
-    </Modal>
   );
 }

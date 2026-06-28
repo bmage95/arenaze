@@ -11,6 +11,7 @@ import {
 import { usePricing, useUpdatePricing, useDevices } from '../api/queries';
 import { ApiError } from '../api/client';
 import { useToast } from '../components/Toast';
+import { Metric } from '../components/Metric';
 
 function apiErr(e: unknown, fallback = 'Something went wrong'): string {
   return e instanceof ApiError ? e.message : fallback;
@@ -35,6 +36,10 @@ export function Pricing() {
   }
 
   const rules = pricingQ.data ?? [];
+  const totalDevices = rules.reduce((sum, r) => sum + deviceCount(r.deviceType), 0);
+  const rates = rules.map((r) => r.ratePaise);
+  const minRate = rates.length ? Math.min(...rates) : 0;
+  const maxRate = rates.length ? Math.max(...rates) : 0;
 
   return (
     <>
@@ -53,8 +58,15 @@ export function Pricing() {
       {rules.length === 0 ? (
         <div className="empty">No pricing rules</div>
       ) : (
-        <div className="panel">
-          <table className="tbl">
+        <>
+          <div className="metrics">
+            <Metric k="Device types" v={rules.length} sub="priced" />
+            <Metric k="Devices" v={totalDevices} sub="on the floor" />
+            <Metric k="Lowest rate" v={formatPaise(minRate)} sub="per hour" />
+            <Metric k="Highest rate" v={formatPaise(maxRate)} sub="per hour" />
+          </div>
+          <div className="panel">
+            <table className="tbl">
             <thead>
               <tr>
                 <th>Device type</th>
@@ -70,7 +82,8 @@ export function Pricing() {
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </>
   );

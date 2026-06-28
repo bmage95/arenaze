@@ -4,7 +4,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Login } from './views/Login';
 import { Floor } from './views/Floor';
-import { Availability } from './views/Availability';
 import { Ledger } from './views/Ledger';
 import { Customers } from './views/Customers';
 import { Analytics } from './views/Analytics';
@@ -20,7 +19,6 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route index element={<Floor />} />
-          <Route path="availability" element={<Availability />} />
           <Route path="ledger" element={<Ledger />} />
           <Route path="customers" element={<Customers />} />
 

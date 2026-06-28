@@ -156,7 +156,10 @@ button{font-family:inherit}
 .field .lab{font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:7px;display:block}
 
 /* drawer + modal */
-.scrim{position:fixed;inset:0;background:rgba(6,3,4,.42);z-index:40;animation:fade .18s ease}
+/* Click-catcher behind a drawer: closes it on an outside click and frosts the
+   floor with a blur (no dimming) so the panel reads as focused while live ops
+   stay visible behind it. The drawer (z-50) paints above this, so it stays crisp. */
+.scrim{position:fixed;inset:0;background:transparent;z-index:40;backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:380px;background:var(--bg-2);border-left:1px solid var(--line);z-index:50;display:flex;flex-direction:column;animation:slide .22s cubic-bezier(.2,.7,.2,1)}
 @keyframes slide{from{transform:translateX(100%)}to{transform:translateX(0)}}

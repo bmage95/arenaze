@@ -107,14 +107,14 @@ function buildDevices(): DeviceSeed[] {
 // ---------------------------------------------------------------------------
 // CRM members (ported) + the catalog of reservations.
 // ---------------------------------------------------------------------------
-interface MemberSeed { name: string; handle: string; tier: 'Casual' | 'Pro' | 'Elite'; }
+interface MemberSeed { name: string; handle: string; phone: string; tier: 'Casual' | 'Pro' | 'Elite'; }
 const MEMBERS: MemberSeed[] = [
-  { name: 'Kabir Malhotra', handle: 'Kabir_M', tier: 'Elite' },
-  { name: 'Riya Sharma', handle: 'Riya.GG', tier: 'Pro' },
-  { name: 'Veer Anand', handle: 'Aces_Veer', tier: 'Elite' },
-  { name: 'Meera Kapoor', handle: 'Meera_K', tier: 'Pro' },
-  { name: 'Tanish Roy', handle: 'Tanish', tier: 'Casual' },
-  { name: 'Yug Patel', handle: 'Yug_99', tier: 'Pro' },
+  { name: 'Kabir Malhotra', handle: 'Kabir_M', phone: '98201 44552', tier: 'Elite' },
+  { name: 'Riya Sharma', handle: 'Riya.GG', phone: '99301 27845', tier: 'Pro' },
+  { name: 'Veer Anand', handle: 'Aces_Veer', phone: '90043 11892', tier: 'Elite' },
+  { name: 'Meera Kapoor', handle: 'Meera_K', phone: '88282 67310', tier: 'Pro' },
+  { name: 'Tanish Roy', handle: 'Tanish', phone: '70459 98123', tier: 'Casual' },
+  { name: 'Yug Patel', handle: 'Yug_99', phone: '63597 44021', tier: 'Pro' },
 ];
 
 interface ReservationSeed {
@@ -189,6 +189,16 @@ class SlotBook {
 }
 
 const rupees = (paise: number): string => '₹' + Math.round(paise / 100).toLocaleString('en-IN');
+
+// Deterministic 10-digit Indian mobile (first digit 6–9), formatted "XXXXX XXXXX".
+// Used to give auto-created player/reservation customers a contact number so the
+// Customers screen's Contact column is populated in the demo. The large, jagged
+// multiplier scatters the digits so consecutive numbers don't share a prefix.
+function genPhone(seq: number): string {
+  const n = 6_000_000_000 + ((seq + 1) * 386_792_311) % 3_900_000_000;
+  const s = String(n);
+  return s.slice(0, 5) + ' ' + s.slice(5);
+}
 
 // ---------------------------------------------------------------------------
 async function main(): Promise<void> {
@@ -279,20 +289,21 @@ async function main(): Promise<void> {
     for (const m of MEMBERS) {
       const res = await client.query<{ id: string }>(
         `INSERT INTO customers (tenant_id, name, handle, phone, tier)
-         VALUES ($1,$2,$3,NULL,$4) RETURNING id`,
-        [tenantId, m.name, m.handle, m.tier],
+         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [tenantId, m.name, m.handle, m.phone, m.tier],
       );
       customerByHandle.set(m.handle, res.rows[0].id);
     }
     const neededHandles: string[] = [];
     for (const d of devices) if (d.player) neededHandles.push(d.player);
     for (const r of RESERVATIONS) neededHandles.push(r.player);
+    let phoneSeq = 0;
     for (const handle of neededHandles) {
       if (customerByHandle.has(handle)) continue;
       const res = await client.query<{ id: string }>(
         `INSERT INTO customers (tenant_id, name, handle, phone, tier)
-         VALUES ($1,$2,$3,NULL,'Casual') RETURNING id`,
-        [tenantId, handle, handle],
+         VALUES ($1,$2,$3,$4,'Casual') RETURNING id`,
+        [tenantId, handle, handle, genPhone(phoneSeq++)],
       );
       customerByHandle.set(handle, res.rows[0].id);
     }

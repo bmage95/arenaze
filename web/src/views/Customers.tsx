@@ -1,6 +1,6 @@
 // Customers (CRM) — ported from the design's Members table, backed by the real
-// customer dataset (derived from bookings). Search by name/handle; click a row to
-// open a detail Drawer with tier, lifetime totals, and booking history.
+// customer dataset (derived from bookings). Search by name/contact number; click a
+// row to open a detail Drawer with tier, lifetime totals, and booking history.
 import { useEffect, useState } from 'react';
 import {
   type BookingStatus,
@@ -68,7 +68,7 @@ export function Customers() {
           className="input"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Search by name or handle…"
+          placeholder="Search by name or number…"
         />
         <button className="btn primary" onClick={() => setQuery(text)}>
           Search
@@ -87,7 +87,7 @@ export function Customers() {
             <thead>
               <tr>
                 <th>Member</th>
-                <th>Handle</th>
+                <th>Contact</th>
                 <th>Tier</th>
                 <th>Hours</th>
                 <th>Lifetime spend</th>
@@ -101,7 +101,7 @@ export function Customers() {
                     <b>{c.name}</b>
                   </td>
                   <td className="mono" style={{ fontSize: 13 }}>
-                    {c.handle}
+                    {c.phone || '—'}
                   </td>
                   <td>
                     <span className={'tier ' + c.tier}>{c.tier}</span>
@@ -144,7 +144,7 @@ export function Customers() {
                   marginTop: 6,
                 }}
               >
-                {detailQ.data.handle}
+                {detailQ.data.phone || 'No contact number'}
               </div>
               <div style={{ marginTop: 12 }}>
                 <span className={'tier ' + detailQ.data.tier}>{detailQ.data.tier}</span>
@@ -177,14 +177,10 @@ export function Customers() {
               <dd className="mono">{formatPaise(detailQ.data.spendPaise)}</dd>
               <dt>Visits</dt>
               <dd className="mono">{detailQ.data.visits}</dd>
+              <dt>Contact</dt>
+              <dd className="mono">{detailQ.data.phone || '—'}</dd>
               <dt>Last seen</dt>
               <dd>{fmtDateTime(detailQ.data.lastSeen)}</dd>
-              {detailQ.data.phone && (
-                <>
-                  <dt>Phone</dt>
-                  <dd className="mono">{detailQ.data.phone}</dd>
-                </>
-              )}
             </dl>
 
             <div className="label" style={{ marginTop: 26 }}>

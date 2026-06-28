@@ -12,6 +12,7 @@ import { useBookings, useCancelBooking } from '../api/queries';
 import { ApiError } from '../api/client';
 import { useToast } from '../components/Toast';
 import { Pill, type PillKind } from '../components/Pill';
+import { Metric } from '../components/Metric';
 
 const STATUS_PILL: Record<BookingStatus, PillKind> = {
   active: 'busy',
@@ -56,6 +57,20 @@ export function Ledger() {
     return [...list].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   }, [bookingsQ.data]);
 
+  // Summary tiles over the current (filtered) result set.
+  const stats = useMemo(() => {
+    let upcoming = 0;
+    let active = 0;
+    let valuePaise = 0;
+    for (const b of rows) {
+      if (b.status === 'upcoming') upcoming += 1;
+      else if (b.status === 'active') active += 1;
+      if (b.status !== 'cancelled') valuePaise += b.totalPaise;
+    }
+    return { total: rows.length, upcoming, active, valuePaise };
+  }, [rows]);
+  const loading = bookingsQ.isLoading;
+
   const cancel = (b: BookingDTO) => {
     if (!window.confirm(`Cancel booking ${b.code}? This frees its devices.`)) return;
     cancelM.mutate(b.id, {
@@ -83,6 +98,17 @@ export function Ledger() {
           Booking Ledger
           <span className="ct">{rows.length} BOOKINGS</span>
         </div>
+      </div>
+
+      <div className="metrics">
+        <Metric k="Bookings" v={loading ? '—' : stats.total} sub={hasFilter ? 'in filter' : 'all'} />
+        <Metric k="Upcoming" v={loading ? '—' : stats.upcoming} sub="reservations" />
+        <Metric k="Active now" v={loading ? '—' : stats.active} sub="in session" subc="up" />
+        <Metric
+          k="Booked value"
+          v={loading ? '—' : formatPaise(stats.valuePaise, { compact: true })}
+          sub="excl. cancelled"
+        />
       </div>
 
       <div className="row" style={{ marginBottom: 18, gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
