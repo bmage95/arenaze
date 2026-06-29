@@ -37,6 +37,11 @@ import type {
   PricingRuleDTO,
   PricingUpdateReq,
   AnalyticsOverview,
+  InvoiceQuery,
+  InvoiceListRes,
+  InvoiceDetail,
+  InvoiceDTO,
+  InvoiceStatusUpdateReq,
 } from '@arenaze/shared';
 
 // `import.meta.env.VITE_API_BASE` -> e.g. http://localhost:4000. Empty string
@@ -224,6 +229,9 @@ export const patchDevice = (id: string, req: PatchDeviceReq) =>
 export const createDevice = (req: CreateDeviceReq) =>
   request<DeviceSnapshot>('/api/devices', { method: 'POST', body: req });
 
+export const deleteDevice = (id: string) =>
+  request<{ ok: true }>(`/api/devices/${id}`, { method: 'DELETE' });
+
 // ---- Dashboard ----
 export const getDashboardTiles = () => request<DashboardTiles>('/api/dashboard/tiles');
 
@@ -265,3 +273,14 @@ export const updatePricing = (id: string, req: PricingUpdateReq) =>
 
 // ---- Analytics (admin) ----
 export const getAnalyticsOverview = () => request<AnalyticsOverview>('/api/analytics/overview');
+
+// ---- Account Ledger / Invoices (admin) ----
+export const listInvoices = (q: InvoiceQuery = {}) =>
+  request<InvoiceListRes>(
+    `/api/analytics/invoices${qs({ period: q.period, from: q.from, to: q.to, status: q.status, method: q.method, q: q.q })}`,
+  );
+
+export const getInvoice = (id: string) => request<InvoiceDetail>(`/api/analytics/invoices/${id}`);
+
+export const updateInvoiceStatus = (id: string, req: InvoiceStatusUpdateReq) =>
+  request<InvoiceDTO>(`/api/analytics/invoices/${id}`, { method: 'PATCH', body: req });

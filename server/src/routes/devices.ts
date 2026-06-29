@@ -16,6 +16,8 @@ interface DeviceRow {
   type: (typeof DEVICE_TYPES)[number];
   spec: string;
   rate_paise: number;
+  games: string[];
+  controllers: number;
   status: 'available' | 'maintenance';
   sort_order: number;
 }
@@ -46,7 +48,7 @@ export async function buildSnapshots(tenantId: string, deviceId?: string, client
     filter = `AND d.id = $${params.length}`;
   }
   const { rows: devices } = await query<DeviceRow>(
-    `SELECT id, label, type, spec, rate_paise, status, sort_order
+    `SELECT id, label, type, spec, rate_paise, games, controllers, status, sort_order
      FROM devices d WHERE d.tenant_id = $1 ${filter} ORDER BY d.sort_order, d.label`,
     params,
     client,
@@ -78,7 +80,15 @@ export async function buildSnapshots(tenantId: string, deviceId?: string, client
   const nowMs = Date.now();
 
   return devices.map((d): DeviceSnapshot => {
-    const base = { id: d.id, label: d.label, type: d.type, spec: d.spec, ratePaise: d.rate_paise };
+    const base = {
+      id: d.id,
+      label: d.label,
+      type: d.type,
+      spec: d.spec,
+      ratePaise: d.rate_paise,
+      games: d.games ?? [],
+      controllers: d.controllers ?? 0,
+    };
     const s = sessByDevice.get(d.id);
     if (s) {
       const elapsedSec = Math.max(0, (nowMs - Date.parse(s.started_at)) / 1000);
@@ -132,15 +142,20 @@ const StartSchema = z.object({
 });
 const ExtendSchema = z.object({ minutes: z.number().int().positive().max(12 * 60) });
 const PatchSchema = z.object({
+  label: z.string().min(1).max(40).optional(),
   status: z.enum(['available', 'maintenance']).optional(),
   spec: z.string().max(120).optional(),
   ratePaise: z.number().int().nonnegative().optional(),
+  games: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
+  controllers: z.number().int().nonnegative().max(64).optional(),
 });
 const CreateSchema = z.object({
   label: z.string().min(1).max(40),
   type: z.enum(DEVICE_TYPES),
   spec: z.string().max(120).default(''),
   ratePaise: z.number().int().nonnegative(),
+  games: z.array(z.string().trim().min(1).max(60)).max(50).default([]),
+  controllers: z.number().int().nonnegative().max(64).default(0),
 });
 
 export async function deviceRoutes(fastify: FastifyInstance): Promise<void> {
@@ -327,7 +342,14 @@ export async function deviceRoutes(fastify: FastifyInstance): Promise<void> {
       }
       const sets: string[] = [];
       const params: unknown[] = [id];
-      for (const [col, val] of [['status', body.status], ['spec', body.spec], ['rate_paise', body.ratePaise]] as const) {
+      for (const [col, val] of [
+        ['label', body.label],
+        ['status', body.status],
+        ['spec', body.spec],
+        ['rate_paise', body.ratePaise],
+        ['games', body.games],
+        ['controllers', body.controllers],
+      ] as const) {
         if (val !== undefined) {
           params.push(val);
           sets.push(`${col} = $${params.length}`);
@@ -345,10 +367,10 @@ export async function deviceRoutes(fastify: FastifyInstance): Promise<void> {
     const { tenantId, userId } = getAuth(req);
     const body = parse(CreateSchema, req.body);
     const { rows } = await query<{ id: string }>(
-      `INSERT INTO devices (tenant_id, label, type, spec, rate_paise, sort_order)
-       VALUES ($1, $2, $3, $4, $5, COALESCE((SELECT max(sort_order) + 1 FROM devices WHERE tenant_id = $1), 0))
+      `INSERT INTO devices (tenant_id, label, type, spec, rate_paise, games, controllers, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE((SELECT max(sort_order) + 1 FROM devices WHERE tenant_id = $1), 0))
        RETURNING id`,
-      [tenantId, body.label, body.type, body.spec, body.ratePaise],
+      [tenantId, body.label, body.type, body.spec, body.ratePaise, body.games, body.controllers],
     ).catch((err) => {
       if (PG.code(err) === PG.UNIQUE_VIOLATION) throw Err.conflict('A device with that label already exists');
       throw err;
@@ -356,5 +378,38 @@ export async function deviceRoutes(fastify: FastifyInstance): Promise<void> {
     await audit(pool, { tenantId, userId, action: 'device.create', entity: 'device', entityId: rows[0].id, meta: body });
     reply.code(201);
     return snapshotOne(tenantId, rows[0].id);
+  });
+
+  // DELETE /devices/:id — admin: remove a device. Blocked once it has any
+  // booking/session history so the ledger + analytics stay intact (use
+  // maintenance to retire a device that's been used).
+  fastify.delete('/devices/:id', { preHandler: requireRole('admin') }, async (req): Promise<{ ok: true }> => {
+    const { tenantId, userId } = getAuth(req);
+    const { id } = req.params as { id: string };
+
+    await withTransaction(async (client) => {
+      const { rows } = await query<{ id: string; label: string }>(
+        `SELECT id, label FROM devices WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
+        [id, tenantId],
+        client,
+      );
+      const device = rows[0];
+      if (!device) throw Err.notFound('Device not found');
+
+      const used = await query(
+        `SELECT 1 WHERE EXISTS (SELECT 1 FROM booking_devices WHERE device_id = $1)
+                    OR EXISTS (SELECT 1 FROM sessions WHERE device_id = $1)`,
+        [id],
+        client,
+      );
+      if (used.rowCount) {
+        throw Err.conflict('Device has booking history — set it to maintenance instead of deleting');
+      }
+
+      await query(`DELETE FROM devices WHERE id = $1`, [id], client);
+      await audit(client, { tenantId, userId, action: 'device.delete', entity: 'device', entityId: id, meta: { label: device.label } });
+    });
+
+    return { ok: true };
   });
 }

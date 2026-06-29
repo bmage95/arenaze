@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Floor', Icon: I.floor, end: true },
   { to: '/ledger', label: 'Bookings', Icon: I.res },
   { to: '/customers', label: 'Customers', Icon: I.mem },
+  { to: '/devices', label: 'Device Manager', Icon: I.dev, admin: true },
   { to: '/analytics', label: 'Analytics', Icon: I.ana, admin: true },
   { to: '/pricing', label: 'Pricing', Icon: I.price, admin: true },
 ];

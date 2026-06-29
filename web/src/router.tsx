@@ -6,6 +6,7 @@ import { Login } from './views/Login';
 import { Floor } from './views/Floor';
 import { Ledger } from './views/Ledger';
 import { Customers } from './views/Customers';
+import { DeviceManager } from './views/DeviceManager';
 import { Analytics } from './views/Analytics';
 import { Pricing } from './views/Pricing';
 import { AppLayout } from './components/AppLayout';
@@ -24,6 +25,7 @@ export function AppRouter() {
 
           {/* admin-only */}
           <Route element={<RequireAdmin />}>
+            <Route path="devices" element={<DeviceManager />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="pricing" element={<Pricing />} />
           </Route>

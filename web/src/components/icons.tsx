@@ -70,6 +70,13 @@ export const I = {
       />
     </svg>
   ),
+  // Device manager (monitor on a stand)
+  dev: (p: IconProps) => (
+    <svg viewBox="0 0 24 24" fill="none" {...p}>
+      <rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8 20h8M12 16v4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  ),
   // Close
   x: (p: IconProps) => (
     <svg viewBox="0 0 24 24" fill="none" {...p}>

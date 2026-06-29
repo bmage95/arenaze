@@ -15,6 +15,8 @@ import type {
   DeviceLiveStatus,
   BookingStatus,
   CustomerTier,
+  PaymentMethod,
+  InvoiceStatus,
 } from './roles.js';
 
 // ---------------------------------------------------------------------------
@@ -113,6 +115,8 @@ export interface DeviceSnapshot {
   type: DeviceType;
   spec: string; // 'RTX 4070 · i7'
   ratePaise: number; // hourly
+  games: string[]; // catalog installed on this machine (Device Manager)
+  controllers: number; // controllers available (consoles); 0 for PC
   status: DeviceLiveStatus; // available | active | reserved | maintenance (derived)
   session: ActiveSession | null; // present when status === 'active'
   reservation: DeviceReservationPeek | null; // next upcoming today when status === 'reserved'
@@ -140,9 +144,12 @@ export interface ExtendDeviceReq {
 }
 
 export interface PatchDeviceReq {
+  label?: string;
   status?: 'available' | 'maintenance';
   spec?: string;
   ratePaise?: number;
+  games?: string[];
+  controllers?: number;
 }
 
 export interface CreateDeviceReq {
@@ -150,6 +157,8 @@ export interface CreateDeviceReq {
   type: DeviceType;
   spec: string;
   ratePaise: number;
+  games?: string[];
+  controllers?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -317,4 +326,57 @@ export interface AnalyticsOverview {
     avgSessionMinutes: number;
     avgTicketPaise: number;
   };
+}
+
+// ---------------------------------------------------------------------------
+// Account Ledger / Invoices (admin)
+//   GET   /api/analytics/invoices?period&from&to&status&method&q -> InvoiceDTO[]
+//   GET   /api/analytics/invoices/:id                            -> InvoiceDetail
+//   PATCH /api/analytics/invoices/:id   { status }               -> InvoiceDTO
+// ---------------------------------------------------------------------------
+export type InvoicePeriod = 'day' | 'month' | 'year' | 'all';
+
+export interface InvoiceDTO {
+  id: string; // transaction id — used to open the full bill
+  invoiceNo: string; // 'INV-1042'
+  customerId: string | null;
+  customerName: string | null;
+  bookingId: string | null;
+  bookingCode: string | null; // 'GG-8847'
+  kind: 'session' | 'booking' | 'refund';
+  amountPaise: number;
+  method: PaymentMethod;
+  status: InvoiceStatus;
+  paidAt: string; // ISO (transaction created_at)
+}
+
+export interface InvoiceDetail extends InvoiceDTO {
+  note: string | null;
+  deviceLabel: string | null;
+  booking: BookingDTO | null; // the entire bill: devices, slot, guests, totals
+}
+
+export interface InvoiceQuery {
+  period?: InvoicePeriod; // quick range relative to today (overrides from/to when set)
+  from?: string; // ISO date (inclusive)
+  to?: string; // ISO date (inclusive)
+  status?: InvoiceStatus;
+  method?: PaymentMethod;
+  q?: string; // customer name or invoice number
+}
+
+export interface InvoiceSummary {
+  count: number;
+  totalPaise: number; // sum of all matched invoices
+  paidPaise: number;
+  pendingPaise: number;
+}
+
+export interface InvoiceListRes {
+  invoices: InvoiceDTO[];
+  summary: InvoiceSummary;
+}
+
+export interface InvoiceStatusUpdateReq {
+  status: InvoiceStatus;
 }

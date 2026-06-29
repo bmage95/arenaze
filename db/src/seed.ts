@@ -232,6 +232,7 @@ async function main(): Promise<void> {
       RESTART IDENTITY CASCADE
     `);
     await client.query(`SELECT setval('booking_code_seq', 8847, false)`);
+    await client.query(`SELECT setval('invoice_no_seq', 1001, false)`);
 
     const nextCode = async (): Promise<string> => {
       const { rows } = await client.query<{ code: string }>(
@@ -260,14 +261,21 @@ async function main(): Promise<void> {
       [tenantId, staffUser, staffHash, 'Staff'],
     );
 
-    // -- devices ---------------------------------------------------------------
+    // -- devices (with games catalog + controller counts per type) -------------
     const devices = buildDevices();
     const deviceByLabel = new Map<string, DeviceSeed>();
+    const GAMES: Record<DeviceSeed['type'], string[]> = {
+      PC: ['Valorant', 'CS2', 'GTA V', 'Fortnite', 'League of Legends'],
+      PS5: ['EA FC 25', 'God of War Ragnarök', 'Spider-Man 2', 'Gran Turismo 7'],
+      Xbox: ['Forza Horizon 5', 'Halo Infinite', 'EA FC 25'],
+      VR: ['Beat Saber', 'Half-Life: Alyx', 'Superhot VR'],
+    };
+    const CONTROLLERS: Record<DeviceSeed['type'], number> = { PC: 0, PS5: 4, Xbox: 4, VR: 2 };
     for (const d of devices) {
       const res = await client.query<{ id: string }>(
-        `INSERT INTO devices (tenant_id, label, type, spec, rate_paise, status, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-        [tenantId, d.label, d.type, d.spec, d.ratePaise, d.status, d.sortOrder],
+        `INSERT INTO devices (tenant_id, label, type, spec, rate_paise, status, sort_order, games, controllers)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [tenantId, d.label, d.type, d.spec, d.ratePaise, d.status, d.sortOrder, GAMES[d.type], CONTROLLERS[d.type]],
       );
       d.id = res.rows[0].id;
       deviceByLabel.set(d.label, d);
@@ -425,11 +433,14 @@ async function main(): Promise<void> {
         [tenantId, d.id, bookingId, bd.rows[0].id, customerId, c.handle ?? 'Walk-in', d.ratePaise, started, ended, accrued],
       );
 
+      // Vary payment method; leave a couple pending to exercise the ledger.
+      const method = (['Cash', 'UPI', 'Card'] as const)[completedCount % 3];
+      const status = completedCount % 4 === 3 ? 'pending' : 'paid';
       await client.query(
         `INSERT INTO transactions
-           (tenant_id, booking_id, session_id, customer_id, device_id, kind, amount_paise, note, created_at)
-         VALUES ($1,$2,$3,$4,$5,'session',$6,$7,$8)`,
-        [tenantId, bookingId, session.rows[0].id, customerId, d.id, accrued, 'Session checkout', ended],
+           (tenant_id, booking_id, session_id, customer_id, device_id, kind, amount_paise, note, created_at, method, status)
+         VALUES ($1,$2,$3,$4,$5,'session',$6,$7,$8,$9,$10)`,
+        [tenantId, bookingId, session.rows[0].id, customerId, d.id, accrued, 'Session checkout', ended, method, status],
       );
       completedCount += 1;
       revenueToday += accrued;

@@ -21,9 +21,16 @@ export type DeviceBaseStatus = (typeof DEVICE_BASE_STATUS)[number];
 export const BOOKING_STATUS = ['upcoming', 'active', 'completed', 'cancelled'] as const;
 export type BookingStatus = (typeof BOOKING_STATUS)[number];
 
+// Account ledger: how a charge was collected and whether it's been settled.
+export const PAYMENT_METHODS = ['Cash', 'UPI', 'Card'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const INVOICE_STATUS = ['pending', 'paid'] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUS)[number];
+
 // Sections of the app that staff may NOT access (admin-only). Enforced server-side
 // AND used to hide nav items on the web.
-export const ADMIN_ONLY_SECTIONS = ['pricing', 'analytics'] as const;
+export const ADMIN_ONLY_SECTIONS = ['devices', 'pricing', 'analytics'] as const;
 export type AdminOnlySection = (typeof ADMIN_ONLY_SECTIONS)[number];
 
 export function isAdminOnly(section: string): section is AdminOnlySection {

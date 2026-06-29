@@ -14,6 +14,8 @@ import type {
   BookingCreateReq,
   BookingExtendReq,
   PricingUpdateReq,
+  InvoiceQuery,
+  InvoiceStatusUpdateReq,
 } from '@arenaze/shared';
 import * as api from './client';
 
@@ -30,6 +32,9 @@ export const queryKeys = {
   customer: (id: string) => ['customer', id] as const,
   pricing: ['pricing'] as const,
   analyticsOverview: ['analyticsOverview'] as const,
+  invoices: (filters: InvoiceQuery = {}) => ['invoices', filters] as const,
+  invoicesAll: ['invoices'] as const,
+  invoice: (id: string) => ['invoice', id] as const,
 };
 
 const POLL_MS = 10_000;
@@ -89,6 +94,21 @@ export function useAnalyticsOverview() {
   });
 }
 
+export function useInvoices(filters: InvoiceQuery = {}) {
+  return useQuery({
+    queryKey: queryKeys.invoices(filters),
+    queryFn: () => api.listInvoices(filters),
+  });
+}
+
+export function useInvoice(id: string) {
+  return useQuery({
+    queryKey: queryKeys.invoice(id),
+    queryFn: () => api.getInvoice(id),
+    enabled: !!id,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations — `useFloorInvalidate` refreshes the live floor after any action.
 // ---------------------------------------------------------------------------
@@ -138,6 +158,22 @@ export function useCreateDevice() {
   return useMutation({
     mutationFn: (req: CreateDeviceReq) => api.createDevice(req),
     onSuccess: () => invalidate(),
+  });
+}
+
+export function useDeleteDevice() {
+  const invalidate = useInvalidator();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteDevice(id),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUpdateInvoiceStatus() {
+  const invalidate = useInvalidator();
+  return useMutation({
+    mutationFn: (v: { id: string; req: InvoiceStatusUpdateReq }) => api.updateInvoiceStatus(v.id, v.req),
+    onSuccess: () => invalidate([queryKeys.invoicesAll, queryKeys.analyticsOverview]),
   });
 }
 
